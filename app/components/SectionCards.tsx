@@ -96,7 +96,11 @@ function SkillsCard() {
   )
 }
 
-function ProjectsCard({ onSelect, dimmed }: { onSelect: (i: number) => void; dimmed: boolean }) {
+function ProjectsCard({ onSelect, dimmed, isActive }: {
+  onSelect: (i: number) => void
+  dimmed: boolean
+  isActive: boolean
+}) {
   return (
     <div style={{
       ...CARD, padding: '28px 34px',
@@ -112,17 +116,19 @@ function ProjectsCard({ onSelect, dimmed }: { onSelect: (i: number) => void; dim
       {PORTFOLIO.projects.map((p, i) => (
         <button
           key={i}
-          onClick={() => onSelect(i)}
+          disabled={!isActive}
+          onClick={() => isActive && onSelect(i)}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             width: '100%', padding: '10px 12px', marginBottom: '6px',
             background: 'rgba(168,216,255,0.05)',
             border: '1px solid rgba(168,216,255,0.1)',
             borderRadius: '10px', color: 'white',
-            cursor: 'pointer', textAlign: 'left',
+            cursor: isActive ? 'pointer' : 'default', textAlign: 'left',
             fontFamily: 'inherit', transition: 'background 0.15s, border-color 0.15s',
           }}
           onMouseEnter={e => {
+            if (!isActive) return
             e.currentTarget.style.background = 'rgba(168,216,255,0.13)'
             e.currentTarget.style.borderColor = 'rgba(168,216,255,0.25)'
           }}
@@ -359,7 +365,7 @@ export default function SectionCards({ activeSection, selectedProject, onSelectP
     <HeroCard key={0} />,
     <AboutCard key={1} />,
     <SkillsCard key={2} />,
-    <ProjectsCard key={3} onSelect={onSelectProject} dimmed={selectedProject !== null} />,
+    <ProjectsCard key={3} onSelect={onSelectProject} dimmed={selectedProject !== null} isActive={activeSection === 3} />,
     <ContactCard key={4} />,
   ]
 

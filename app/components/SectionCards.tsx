@@ -192,6 +192,28 @@ function ContactCard() {
   )
 }
 
+// Minimal hint shown on desktop in place of the project list card
+// (the actual project items are floating 3-D text labels in the scene)
+function ProjectsHint({ dimmed }: { dimmed: boolean }) {
+  return (
+    <div style={{
+      ...CARD,
+      padding: '20px 32px',
+      width: 'min(300px, 88vw)',
+      textAlign: 'center',
+      opacity: dimmed ? 0 : 1,
+      pointerEvents: dimmed ? 'none' : 'auto',
+      transition: 'opacity 0.2s ease',
+    }}>
+      <div style={{ ...LBL, textAlign: 'center' }}>Projects — Lesson 03</div>
+      <h2 style={{ ...TTL, fontSize: '22px', marginBottom: '8px', textAlign: 'center' }}>Featured Work</h2>
+      <p style={{ ...BODY, fontSize: '12px', opacity: 0.55, lineHeight: 1.75, textAlign: 'center' }}>
+        Use arrow keys or click the arrows<br />to browse projects in 3D.
+      </p>
+    </div>
+  )
+}
+
 // ── Mobile project detail overlay ─────────────────────────────────────────
 
 const TOTAL = PORTFOLIO.projects.length
@@ -365,7 +387,9 @@ export default function SectionCards({ activeSection, selectedProject, onSelectP
     <HeroCard key={0} />,
     <AboutCard key={1} />,
     <SkillsCard key={2} />,
-    <ProjectsCard key={3} onSelect={onSelectProject} dimmed={selectedProject !== null} isActive={activeSection === 3} />,
+    isMobile
+      ? <ProjectsCard key={3} onSelect={onSelectProject} dimmed={selectedProject !== null} isActive={activeSection === 3} />
+      : null,
     <ContactCard key={4} />,
   ]
 
@@ -381,6 +405,7 @@ export default function SectionCards({ activeSection, selectedProject, onSelectP
       )}
 
       {cards.map((card, i) => {
+        if (!card) return null
         const isActive = activeSection === i
         const pos = POSITIONS_DESKTOP[i]
 

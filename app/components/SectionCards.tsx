@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { PORTFOLIO } from './ClassroomCanvas'
+import { PORTFOLIO } from '../data/portfolio'
 
 // ── Shared styles ─────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useCallback } from 'react'
-import { SECTIONS } from './components/ClassroomCanvas'
+import { SECTIONS } from './data/portfolio'
 import SectionCards from './components/SectionCards'
 
 const ClassroomCanvas = dynamic(() => import('./components/ClassroomCanvas'), { ssr: false })

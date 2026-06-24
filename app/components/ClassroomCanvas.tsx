@@ -147,12 +147,12 @@ const CAROUSEL_CENTER: [number, number, number] = [0, 2.92, 2]
 
 
 const PROJECT_PLACEMENTS = [
-  { pos: [-2.5, 2.8, -4] as [number,number,number], cam: new THREE.Vector3(-2.5, 3.5, 15.5), look: new THREE.Vector3(-2.5, 2.6, -4) },   // front-left  (chalkboard)
-  { pos: [ 2.5, 1.8, -4] as [number,number,number], cam: new THREE.Vector3( 1.5, 3.5, -0.5), look: new THREE.Vector3( 2.5, 2.6, -4) },   // front-right
-  { pos: [-3.5, 2.8,  2] as [number,number,number], cam: new THREE.Vector3( 0,   3.5,  2.5), look: new THREE.Vector3(-4.5, 2.6,  0) },   // left wall
-  { pos: [ 4.5, 1.8,  0] as [number,number,number], cam: new THREE.Vector3( 0,   3.5,  2.5), look: new THREE.Vector3( 4.5, 2.6,  0) },   // right wall
-  { pos: [-2.0, 0.8,  3] as [number,number,number], cam: new THREE.Vector3( 1,   3.5,  9  ), look: new THREE.Vector3(-2.0, 2.6,  5) },   // back-left
-  { pos: [ 0,   2.6,  7] as [number,number,number], cam: new THREE.Vector3( 0,   4.5, 12  ), look: new THREE.Vector3( 0,   3.2,  7) },   // back-center (MCMC video)
+  { cam: new THREE.Vector3(-2.5, 3.5, 15.5), look: new THREE.Vector3(-2.5, 3.6, -4)  },
+  { cam: new THREE.Vector3( 1.5, 3.5, 10.5), look: new THREE.Vector3( 2.5, 2.6, -4)  },
+  { cam: new THREE.Vector3( 0,   3.5,  8.5), look: new THREE.Vector3(-4.5, 2.6,  0)  },
+  { cam: new THREE.Vector3( 0,   3.5,  2.5), look: new THREE.Vector3( 4.5, 2.6,  0)  },
+  { cam: new THREE.Vector3( 1,   3.5,  9  ), look: new THREE.Vector3(-2.0, 2.6,  5)  },
+  { cam: new THREE.Vector3( 0,   4.5, 12  ), look: new THREE.Vector3( 0,   3.2,  7)  },
 ]
 
 // ── Scene components ───────────────────────────────────────────────────────
@@ -163,9 +163,10 @@ function Classroom() {
 }
 useGLTF.preload('/models/anime_class_room.glb')
 
-function CameraRig({ scrollProgress, selectedProject }: {
+function CameraRig({ scrollProgress, selectedProject, panRef }: {
   scrollProgress: number
   selectedProject: number | null
+  panRef: React.MutableRefObject<number>
 }) {
   const { camera } = useThree()
   const tPos  = useRef(new THREE.Vector3())
@@ -175,12 +176,13 @@ function CameraRig({ scrollProgress, selectedProject }: {
 
   useFrame(() => {
     if (selectedProject !== null) {
-      // Fly camera to face the selected project card
       const p = PROJECT_PLACEMENTS[selectedProject]
       tPos.current.copy(p.cam)
-      tLook.current.copy(p.look)
+      // Pan look target left/right based on nav direction, then decay back to center
+      tLook.current.set(p.look.x + panRef.current * 2.8, p.look.y, p.look.z)
+      panRef.current *= 0.87
     } else {
-      // Scroll-driven path
+      panRef.current = 0
       const raw = Math.min(scrollProgress * total, total - 0.001)
       const i   = Math.floor(raw)
       const t   = raw - i
@@ -225,169 +227,108 @@ type Project = typeof PORTFOLIO.projects[0]
 
 const TOTAL_PROJECTS = PORTFOLIO.projects.length
 
-function ProjectDetailText({ project, index, pos, onClose, onSelect }: {
+// Pure DOM overlay — always screen-centered regardless of camera position
+function ProjectDetailText({ project, index, direction, onClose, onSelect }: {
   project: Project
   index: number
-  pos: [number, number, number]
+  direction: number  // -1 from left · 0 fade · 1 from right
   onClose: () => void
   onSelect: (i: number) => void
 }) {
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
   const hasPrev = index > 0
   const hasNext = index < TOTAL_PROJECTS - 1
-
-  const navBtn = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: '38px', height: '38px',
-    background: 'transparent',
-    border: `1px solid ${active ? 'rgba(168,216,255,0.45)' : 'rgba(255,255,255,0.1)'}`,
-    borderRadius: '9px',
-    color: active ? 'rgba(168,216,255,0.9)' : 'rgba(255,255,255,0.18)',
-    cursor: active ? 'pointer' : 'default',
-    flexShrink: 0, fontFamily: 'inherit',
-    transition: 'background 0.15s, box-shadow 0.15s',
-  })
+  const slideX = direction > 0 ? '36px' : direction < 0 ? '-36px' : '0px'
 
   return (
-    <Float speed={0.8} floatIntensity={0.18} rotationIntensity={0} floatingRange={[-0.06, 0.06]}>
-      <Html
-        position={pos}
-        center
-        zIndexRange={[200, 0]}
-        style={{ pointerEvents: 'auto' }}
-        wrapperClass="project-detail-wrapper"
-      >
-        <div style={{
-          width: 'min(380px, 92vw)',
-          fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
-          color: 'white',
-          textAlign: 'center',
-          animation: 'detailIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards',
-        }}>
-          {/* Counter */}
-          <div style={{
-            fontSize: '10px', letterSpacing: '4px', color: '#a8d8ff',
-            opacity: 0.5, marginBottom: '12px',
-          }}>
-            {String(index + 1).padStart(2, '0')} · {String(TOTAL_PROJECTS).padStart(2, '0')}
-          </div>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 20,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      pointerEvents: 'none',
+    }}>
+      <div style={{
+        zoom: '2',
+        pointerEvents: 'auto',
+        width: 'min(400px, 100vw)',
+        fontFamily: 'var(--font-geist-sans, system-ui, sans-serif)',
+        color: 'white',
+        textAlign: 'center',
+        transform: entered ? 'translateX(0) translateY(0)' : `translateX(${slideX}) translateY(10px)`,
+        opacity: entered ? 1 : 0,
+        transition: 'transform 0.45s cubic-bezier(0.16,1,0.3,1), opacity 0.35s ease',
+      }}>
 
-          {/* Title — big glowing text */}
-          <h3 style={{
-            fontSize: '34px', fontWeight: 800, margin: '0 0 10px',
-            letterSpacing: '-0.5px', lineHeight: 1.1,
-            textShadow: '0 0 40px rgba(168,216,255,0.75), 0 0 80px rgba(168,216,255,0.35)',
-          }}>
-            {project.title}
-          </h3>
-
-          {/* Thin divider */}
-          <div style={{
-            width: '36px', height: '1px',
-            background: 'rgba(168,216,255,0.45)',
-            margin: '0 auto 16px',
-          }} />
-
-          {/* Description */}
-          <p style={{
-            fontSize: '13px', lineHeight: 1.85,
-            color: 'rgba(255,255,255,0.62)',
-            margin: '0 0 18px',
-          }}>
-            {project.description}
-          </p>
-
-          {/* Tech tags */}
-          <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: '6px',
-            justifyContent: 'center', marginBottom: '24px',
-          }}>
-            {project.technologies.map(t => (
-              <span key={t} style={{
-                fontSize: '10px', padding: '3px 11px',
-                background: 'rgba(168,216,255,0.06)',
-                border: '1px solid rgba(168,216,255,0.28)',
-                borderRadius: '99px', color: '#a8d8ff',
-                letterSpacing: '0.5px',
-              }}>{t}</span>
-            ))}
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
-            {/* Prev */}
-            <button
-              onClick={() => hasPrev && onSelect(index - 1)}
-              disabled={!hasPrev}
-              style={navBtn(hasPrev)}
-              onMouseEnter={e => { if (hasPrev) { e.currentTarget.style.background = 'rgba(168,216,255,0.12)'; e.currentTarget.style.boxShadow = '0 0 18px rgba(168,216,255,0.2)' } }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-
-            {/* View Site */}
-            <a href={project.link} target="_blank" rel="noopener noreferrer"
-              style={{
-                flex: 1, display: 'inline-flex', alignItems: 'center',
-                justifyContent: 'center', gap: '7px',
-                padding: '11px 18px',
-                background: 'transparent',
-                border: '1px solid rgba(168,216,255,0.5)',
-                borderRadius: '10px',
-                color: '#a8d8ff', textDecoration: 'none',
-                fontSize: '12px', fontWeight: 700, letterSpacing: '0.5px',
-                textShadow: '0 0 18px rgba(168,216,255,0.7)',
-                boxShadow: '0 0 22px rgba(168,216,255,0.1)',
-                transition: 'background 0.15s, box-shadow 0.15s',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(168,216,255,0.1)'
-                e.currentTarget.style.boxShadow = '0 0 34px rgba(168,216,255,0.28)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.boxShadow = '0 0 22px rgba(168,216,255,0.1)'
-              }}
-            >
-              View Site
-              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-                <path d="M2 12L12 2M12 2H5M12 2V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </a>
-
-            {/* Next */}
-            <button
-              onClick={() => hasNext && onSelect(index + 1)}
-              disabled={!hasNext}
-              style={navBtn(hasNext)}
-              onMouseEnter={e => { if (hasNext) { e.currentTarget.style.background = 'rgba(168,216,255,0.12)'; e.currentTarget.style.boxShadow = '0 0 18px rgba(168,216,255,0.2)' } }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Back */}
-          <button onClick={onClose}
-            style={{
-              marginTop: '14px', width: '100%', padding: '8px',
-              background: 'transparent', border: 'none',
-              color: 'rgba(255,255,255,0.22)', cursor: 'pointer',
-              fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase',
-              fontFamily: 'inherit', transition: 'color 0.15s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.55)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.22)')}
-          >
-            ← back to list
-          </button>
+        {/* Counter */}
+        <div style={{ fontSize: '10px', letterSpacing: '5px', color: 'rgba(168,216,255,0.38)', marginBottom: '20px' }}>
+          {String(index + 1).padStart(2, '0')} / {String(TOTAL_PROJECTS).padStart(2, '0')}
         </div>
-      </Html>
-    </Float>
+
+        {/* Title */}
+        <h3 style={{
+          fontSize: '40px', fontWeight: 800, margin: '0 0 10px',
+          letterSpacing: '-0.5px', lineHeight: 1.0,
+          textShadow: '0 0 60px rgba(168,216,255,0.95), 0 0 120px rgba(168,216,255,0.5)',
+        }}>
+          {project.title}
+        </h3>
+
+        {/* Tech */}
+        <div style={{
+          fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase',
+          color: 'rgba(168,216,255,0.45)', marginBottom: '22px',
+        }}>
+          {project.technologies.join(' · ')}
+        </div>
+
+        {/* Hairline */}
+        <div style={{ width: '28px', height: '1px', background: 'rgba(168,216,255,0.22)', margin: '0 auto 22px' }} />
+
+        {/* Description */}
+        <p style={{ fontSize: '13px', lineHeight: 2.0, fontStyle: 'italic', color: 'rgba(255,255,255,0.42)', margin: '0 0 28px' }}>
+          {project.description}
+        </p>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px' }}>
+          <button
+            onClick={() => hasPrev && onSelect(index - 1)} disabled={!hasPrev}
+            style={{ background: 'none', border: 'none', padding: '0', color: hasPrev ? 'rgba(168,216,255,0.6)' : 'rgba(255,255,255,0.08)', cursor: hasPrev ? 'pointer' : 'default', fontSize: '28px', lineHeight: '1', fontFamily: 'inherit', transition: 'color 0.15s, text-shadow 0.15s' }}
+            onMouseEnter={e => { if (hasPrev) e.currentTarget.style.textShadow = '0 0 20px rgba(168,216,255,0.7)' }}
+            onMouseLeave={e => { e.currentTarget.style.textShadow = 'none' }}
+          >←</button>
+
+          <a href={project.link} target="_blank" rel="noopener noreferrer"
+            style={{ color: 'rgba(168,216,255,0.75)', textDecoration: 'none', fontSize: '11px', fontWeight: 700, letterSpacing: '2px', textTransform: 'uppercase', textShadow: '0 0 22px rgba(168,216,255,0.55)', borderBottom: '1px solid rgba(168,216,255,0.25)', paddingBottom: '3px', transition: 'color 0.15s, text-shadow 0.15s, border-color 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'rgba(168,216,255,1)'; e.currentTarget.style.textShadow = '0 0 30px rgba(168,216,255,0.9)'; e.currentTarget.style.borderColor = 'rgba(168,216,255,0.6)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(168,216,255,0.75)'; e.currentTarget.style.textShadow = '0 0 22px rgba(168,216,255,0.55)'; e.currentTarget.style.borderColor = 'rgba(168,216,255,0.25)' }}
+          >
+            View Site ↗
+          </a>
+
+          <button
+            onClick={() => hasNext && onSelect(index + 1)} disabled={!hasNext}
+            style={{ background: 'none', border: 'none', padding: '0', color: hasNext ? 'rgba(168,216,255,0.6)' : 'rgba(255,255,255,0.08)', cursor: hasNext ? 'pointer' : 'default', fontSize: '28px', lineHeight: '1', fontFamily: 'inherit', transition: 'color 0.15s, text-shadow 0.15s' }}
+            onMouseEnter={e => { if (hasNext) e.currentTarget.style.textShadow = '0 0 20px rgba(168,216,255,0.7)' }}
+            onMouseLeave={e => { e.currentTarget.style.textShadow = 'none' }}
+          >→</button>
+        </div>
+
+        {/* Back */}
+        <button onClick={onClose}
+          style={{ marginTop: '22px', display: 'block', width: '100%', padding: '6px', background: 'none', border: 'none', color: 'rgba(255,255,255,0.15)', cursor: 'pointer', fontSize: '10px', letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'inherit', transition: 'color 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.15)')}
+        >
+          esc · back
+        </button>
+
+      </div>
+    </div>
   )
 }
 
@@ -464,7 +405,7 @@ function ProjectCarousel({ onSelect }: { onSelect: (i: number) => void }) {
                     position: 'absolute',
                     left: `${slotX}px`,
                     top: '50%',
-                    transform: 'translate(-50%, -50%)',
+                    transform: 'translate(-50%, -50%) translateZ(0)',
                     width: isCenter ? '220px' : abs === 1 ? '130px' : '70px',
                     opacity,
                     textAlign: 'center',
@@ -474,10 +415,10 @@ function ProjectCarousel({ onSelect }: { onSelect: (i: number) => void }) {
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
                     gap: '4px',
+                    willChange: 'left, opacity',
                     transition: [
                       'left 0.45s cubic-bezier(0.16,1,0.3,1)',
                       'opacity 0.45s ease',
-                      'width 0.45s cubic-bezier(0.16,1,0.3,1)',
                     ].join(', '),
                   }}
                 >
@@ -496,7 +437,6 @@ function ProjectCarousel({ onSelect }: { onSelect: (i: number) => void }) {
                       : 'none',
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     maxWidth: '100%',
-                    transition: 'font-size 0.45s cubic-bezier(0.16,1,0.3,1)',
                   }}>
                     {p.title}
                   </div>
@@ -586,14 +526,14 @@ function SceneReady({ onLoaded }: { onLoaded: () => void }) {
   return null
 }
 
-function Scene({ scrollProgress, activeSection, selectedProject, onCloseProject, onSelectProject, isMobile, onLoaded }: {
+function Scene({ scrollProgress, activeSection, selectedProject, onSelectProject, isMobile, onLoaded, panRef }: {
   scrollProgress: number
   activeSection: number
   selectedProject: number | null
-  onCloseProject: () => void
   onSelectProject: (i: number) => void
   isMobile: boolean
   onLoaded: () => void
+  panRef: React.RefObject<number>
 }) {
   return (
     <>
@@ -613,24 +553,12 @@ function Scene({ scrollProgress, activeSection, selectedProject, onCloseProject,
         />
       ))}
 
-      {/* Floating project detail text — desktop only; mobile uses a DOM overlay instead */}
-      {selectedProject !== null && !isMobile && (
-        <ProjectDetailText
-          key={selectedProject}
-          project={PORTFOLIO.projects[selectedProject]}
-          index={selectedProject}
-          pos={PROJECT_PLACEMENTS[selectedProject].pos}
-          onClose={onCloseProject}
-          onSelect={onSelectProject}
-        />
-      )}
-
       {/* 3-D carousel — desktop only, visible in section 3 before selection */}
       {!isMobile && activeSection === 3 && selectedProject === null && (
         <ProjectCarousel onSelect={onSelectProject} />
       )}
 
-      <CameraRig scrollProgress={scrollProgress} selectedProject={selectedProject} />
+      <CameraRig scrollProgress={scrollProgress} selectedProject={selectedProject} panRef={panRef} />
     </>
   )
 }
@@ -646,6 +574,20 @@ export default function ClassroomCanvas({ scrollProgress, activeSection, selecte
   isMobile: boolean
   onLoaded: () => void
 }) {
+  const panRef = useRef(0)
+  const [navDir, setNavDir] = useState(0)
+
+  function handleSelectProject(i: number) {
+    if (selectedProject !== null) {
+      const dir = i > selectedProject ? 1 : -1
+      panRef.current = dir
+      setNavDir(dir)
+    } else {
+      setNavDir(0)
+    }
+    onSelectProject(i)
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
       <Canvas
@@ -659,13 +601,25 @@ export default function ClassroomCanvas({ scrollProgress, activeSection, selecte
             scrollProgress={scrollProgress}
             activeSection={activeSection}
             selectedProject={selectedProject}
-            onCloseProject={onCloseProject}
-            onSelectProject={onSelectProject}
+            onSelectProject={handleSelectProject}
             isMobile={isMobile}
             onLoaded={onLoaded}
+            panRef={panRef}
           />
         </Suspense>
       </Canvas>
+
+      {/* Project detail — always screen-centered DOM overlay, never anchored to a 3-D point */}
+      {!isMobile && selectedProject !== null && (
+        <ProjectDetailText
+          key={selectedProject}
+          project={PORTFOLIO.projects[selectedProject]}
+          index={selectedProject}
+          direction={navDir}
+          onClose={onCloseProject}
+          onSelect={handleSelectProject}
+        />
+      )}
     </div>
   )
 }
